@@ -1,44 +1,53 @@
 import streamlit as st
-import numpy as np
-from sklearn.linear_model import LinearRegression
+from transformers import pipeline
 
-# --- 1. AI BACKEND (The Brain) ---
-# Simple data: Square Feet vs Price (in $1000s)
-X = np.array([[600], [800], [1000], [1200], [1500], [2000], [2500]])
-y = np.array([150, 180, 220, 250, 310, 400, 500])
+# --- UI/UX CONFIGURATION ---
+st.set_page_config(page_title="Zenith AI", page_icon="🤖")
 
-model = LinearRegression()
-model.fit(X, y)
-
-# --- 2. UI/UX FRONTEND (The Face) ---
-st.set_page_config(page_title="Housely AI", page_icon="🏠")
-
-# Custom CSS for a cleaner look
+# Custom CSS for a modern Chat UX
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { width: 100%; border-radius: 10px; height: 3em; background-color: #4A90E2; color: white; }
-    .prediction-box { padding: 20px; border-radius: 15px; background-color: #e3f2fd; text-align: center; border: 1px solid #90caf9; }
+    .stChatFloatingInputContainer { background-color: rgba(0,0,0,0); }
+    .stChatMessage { border-radius: 15px; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏠 Housely AI Predictor")
-st.write("Enter the house size below to get an instant AI-powered market valuation.")
+# --- AI BACKEND (The Model) ---
+@st.cache_resource
+def load_chatbot():
+    # Using 'Blenderbot', a high-quality conversational AI by Meta
+    return pipeline("conversational", model="facebook/blenderbot-400M-distill")
 
-# Input Section
-sqft = st.number_input("Square Footage (sq ft)", min_value=500, max_value=5000, value=1500, step=50)
+chatbot = load_chatbot()
 
-# Prediction Logic
-prediction = model.predict([[sqft]])[0]
+# --- CHAT HISTORY STORAGE ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# UI Result Display
-st.markdown("---")
-st.markdown(f"""
-    <div class="prediction-box">
-        <h3 style='margin:0; color: #1565c0;'>Estimated Market Value</h3>
-        <h1 style='margin:0; color: #0d47a1;'>${prediction:,.2f}k</h1>
-    </div>
-    """, unsafe_allow_html=True)
+# --- UI LAYOUT ---
+st.title("🤖 Zenith AI")
+st.caption("A lightweight conversational assistant powered by Blenderbot.")
 
-# Add a little UX "Trust" feature
-st.caption("⚠️ This prediction is based on a Linear Regression model using local historical data.")
+# Display chat messages from history on app rerun
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# React to user input
+if prompt := st.chat_input("Message Zenith AI..."):
+    # Display user message in chat message container
+    st.chat_message("user").markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
+    # Generate AI response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            from transformers import Conversation
+            # Create conversation object for the model
+            conversation = Conversation(prompt)
+            result = chatbot(conversation)
+            response = result.generated_responses[-1]
+            st.markdown(response)
+    
+    # Add assistant response to history
+    st.session_state.messages.append({"role": "assistant", "content": response})

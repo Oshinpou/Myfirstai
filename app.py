@@ -1,51 +1,68 @@
 import streamlit as st
-from transformers import pipeline, Conversation
+from transformers import pipeline
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Nova AI", page_icon="✨", layout="centered")
+# --- 1. PAGE CONFIGURATION (UX) ---
+st.set_page_config(
+    page_title="Zenith AI Chatbot",
+    page_icon="🤖",
+    layout="centered"
+)
 
-# --- CUSTOM UI/UX (CSS) ---
+# Custom CSS to make it look like a modern chat app
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; color: white; }
-    .stChatMessage { border-radius: 10px; border: 1px solid #30363d; }
+    .stApp { background-color: #0e1117; }
+    .stChatMessage { border-radius: 15px; border: 1px solid #30363d; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- AI MODEL ENGINE ---
+# --- 2. THE AI BRAIN (Backend) ---
 @st.cache_resource
-def load_ai():
-    # We use a 'Distilled' model because it's faster and smaller for free hosting
+def load_chatbot():
+    # We use Blenderbot-400M because it fits in the 2GB RAM limit of free hosts
     return pipeline("conversational", model="facebook/blenderbot-400M-distill")
 
-chat_engine = load_ai()
+chat_pipeline = load_chatbot()
 
-# --- SESSION HANDLING ---
+# --- 3. CHAT MEMORY (Logic) ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- HEADER ---
-st.title("✨ Nova AI Assistant")
-st.info("I am a lightweight AI running on a free server. I can chat, answer questions, and remember our conversation!")
+# --- 4. THE USER INTERFACE (Frontend) ---
+st.title("🤖 Zenith AI")
+st.caption("A smart conversational assistant powered by Open Source AI.")
 
-# --- CHAT INTERFACE ---
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Display existing chat history
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-if prompt := st.chat_input("Ask me anything..."):
-    # User message
+# Handle new user input
+if prompt := st.chat_input("How can I help you today?"):
+    # Add user message to UI and State
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # AI response
+    # Generate AI Response
     with st.chat_message("assistant"):
-        with st.spinner("Processing..."):
-            conv = Conversation(prompt)
-            # Add past context so the AI "remembers"
-            result = chat_engine(conv)
-            ai_response = result.generated_responses[-1]
-            st.markdown(ai_response)
+        with st.spinner("Thinking..."):
+            from transformers import Conversation
             
-    st.session_state.messages.append({"role": "assistant", "content": ai_response})
+            # Create a conversation object with history
+            # This allows the AI to "remember" context
+            past_user_inputs = [m["content"] for m in st.session_state.messages if m["role"] == "user"]
+            generated_responses = [m["content"] for m in st.session_state.messages if m["role"] == "assistant"]
+            
+            # Pass the current prompt and history to the model
+            conversation = Conversation(
+                text=prompt, 
+                past_user_inputs=past_user_inputs[:-1], 
+                generated_responses=generated_responses
+            )
+            
+            result = chat_pipeline(conversation)
+            full_response = result.generated_responses[-1]
+            
+            st.markdown(full_response)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
